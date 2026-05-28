@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>معاينة كاميرا القمر الصناعي</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        img { max-width: 100%; border-radius: 8px; margin-top: 15px; display: none; }
+        .status { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>لوحة التحكم واستقبال الصور 📸</h2>
+        <p class="status" id="status-text">جاري التحقق من وجود صور...</p>
+        <img id="camera-frame" src="" alt="Camera Stream">
+    </div>
+
+    <script>
+        async function fetchImage() {
+            try {
+                // هيروح ينده على الـ API اللي عملناه ويشوف لو في صورة
+                const response = await fetch('/api/upload');
+                const data = await response.json();
+                
+                if (data.data) {
+                    const img = document.getElementById('camera-frame');
+                    img.src = "data:image/jpeg;base64," + data.data;
+                    img.style.display = "block";
+                    document.getElementById('status-text').innerText = "آخر صورة تم استقبالها في: " + new Date(data.time).toLocaleString('ar-EG');
+                } else {
+                    document.getElementById('status-text').innerText = "السيرفر جاهز، ومستني الكاميرا تبعت أول صورة... 📡";
+                }
+            } catch (err) {
+                document.getElementById('status-text').innerText = "السيرفر شغال وتمام 👍";
+            }
+        }
+        // يشتغل تلقائياً أول ما الصفحة تفتح
+        fetchImage();
+        // يعمل تحديث تلقائي كل 5 ثواني عشان لو الصورة اتغيرت
+        setInterval(fetchImage, 5000);
+    </script>
+</body>
+</html>
