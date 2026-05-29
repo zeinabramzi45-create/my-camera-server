@@ -38,16 +38,10 @@
                     
                     imagesArray.forEach((imgData) => {
                         const card = document.createElement('div');
-                        const card.className = 'photo-card';
+                        card.className = 'photo-card';
                         
                         const img = document.createElement('img');
-                        
-                        // الفحص الذكي لنوع البيانات (رابط مباشر أو كود مشفر)
-                        if (imgData.isUrl) {
-                            img.src = imgData.data; 
-                        } else {
-                            img.src = "data:image/jpeg;base64," + imgData.data; 
-                        }
+                        img.src = "data:image/jpeg;base64," + imgData.data;
                         
                         const timeP = document.createElement('p');
                         timeP.className = 'time-tag';
