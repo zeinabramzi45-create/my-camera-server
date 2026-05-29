@@ -1,11 +1,12 @@
+const SUPABASE_URL = "https://fnpzucecyatjqnmoowuy.supabase.co"; 
+const SUPABASE_KEY = "sb_publishable_BNDYkCj9c466S2P3I89S2A_lltdDqMF";
+const BUCKET_NAME = "photos";
+
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: false, // استقبال الـ Multipart الخام من الكاميرا
   },
 };
-
-// تحويل المتغير إلى مصفوفة (Array) لتخزين كل الصور
-let allImages = [];
 
 function parseMultipart(req) {
   return new Promise((resolve, reject) => {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // استقبال صورة جديدة وإضافتها للمجموعة
+  // 1. استقبال الصورة من الكاميرا ورفعها لـ Supabase Storage
   if (req.method === 'POST') {
     try {
       const rawBuffer = await parseMultipart(req);
@@ -36,20 +37,26 @@ export default async function handler(req, res) {
 
       if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
         const imageBinary = bufferStr.substring(startIdx + 4, endIdx);
-        const base64Data = Buffer.from(imageBinary, 'binary').toString('base64');
+        const imageBuffer = Buffer.from(imageBinary, 'binary');
         
-        // إضافة الصورة الجديدة في أول المصفوفة (عشان الأحدث يظهر فوق)
-        allImages.unshift({
-          data: base64Data,
-          time: new Date().toISOString()
+        const filename = `cubesat-${Date.now()}.jpg`;
+
+        // رفع الملف مباشرة إلى Supabase Storage عن طريق الـ API
+        const uploadResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${filename}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'image/jpeg'
+          },
+          body: imageBuffer
         });
 
-        // اختياري: للحفاظ على ذاكرة السيرفر المجاني، بنحتفظ بآخر 50 صورة مثلاً
-        if (allImages.length > 50) {
-          allImages.pop(); 
+        if (!uploadResponse.ok) {
+          const errText = await uploadResponse.text();
+          throw new Error(`Supabase upload failed: ${errText}`);
         }
 
-        console.log('New image added to the gallery!');
+        console.log('Image saved permanently to Supabase!');
         res.setHeader('Content-Type', 'text/plain');
         return res.status(200).send("HTTP/1.1 200 OK\r\n\r\nImage Received");
       } else {
@@ -60,9 +67,34 @@ export default async function handler(req, res) {
     }
   }
 
-  // إرسال مصفوفة الصور كاملة لصفحة الـ HTML
+  // 2. جلب قائمة الصور كاملة من الـ Supabase وعرضها
   if (req.method === 'GET') {
-    return res.status(200).json(allImages);
+    try {
+      const listResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${BUCKET_NAME}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          limit: 30,
+          sortBy: { column: 'created_at', order: 'desc' }
+        })
+      });
+
+      if (!listResponse.ok) throw new Error('Failed to fetch image list');
+      const files = await listResponse.json();
+
+      // تحويل الملفات لروابط مباشرة ثابتة ودائمة
+      const sortedImages = files.map(file => ({
+        url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${file.name}`,
+        time: file.created_at
+      }));
+
+      return res.status(200).json(sortedImages);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
   }
 
   return res.status(405).send("Method not allowed");
