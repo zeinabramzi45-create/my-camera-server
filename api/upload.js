@@ -1,12 +1,12 @@
 export const config = {
   api: {
-    bodyParser: false, // إيقاف البارسير التلقائي لاستقبال الـ Multipart الخام من الأردوينو
+    bodyParser: false,
   },
 };
 
-let lastUploadedImage = null;
+// تحويل المتغير إلى مصفوفة (Array) لتخزين كل الصور
+let allImages = [];
 
-// دالة تجميع البيانات الخام القادمة من دالة الكاميرا
 function parseMultipart(req) {
   return new Promise((resolve, reject) => {
     let chunks = [];
@@ -25,13 +25,12 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // استقبال الصورة الكبيرة القادمة من الكاميرا بـ Multipart
+  // استقبال صورة جديدة وإضافتها للمجموعة
   if (req.method === 'POST') {
     try {
       const rawBuffer = await parseMultipart(req);
       const bufferStr = rawBuffer.toString('binary');
       
-      // البحث عن بداية ونهاية الصورة الصافية داخل طلب الأردوينو
       const startIdx = bufferStr.indexOf('\r\n\r\n');
       const endIdx = bufferStr.lastIndexOf('\r\n--');
 
@@ -39,14 +38,20 @@ export default async function handler(req, res) {
         const imageBinary = bufferStr.substring(startIdx + 4, endIdx);
         const base64Data = Buffer.from(imageBinary, 'binary').toString('base64');
         
-        lastUploadedImage = {
+        // إضافة الصورة الجديدة في أول المصفوفة (عشان الأحدث يظهر فوق)
+        allImages.unshift({
           data: base64Data,
           time: new Date().toISOString()
-        };
+        });
 
-        console.log('Image saved successfully via Instructor Multipart method!');
+        // اختياري: للحفاظ على ذاكرة السيرفر المجاني، بنحتفظ بآخر 50 صورة مثلاً
+        if (allImages.length > 50) {
+          allImages.pop(); 
+        }
+
+        console.log('New image added to the gallery!');
         res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("HTTP/1.1 200 OK\r\n\r\nImage Received"); 
+        return res.status(200).send("HTTP/1.1 200 OK\r\n\r\nImage Received");
       } else {
         return res.status(400).send("Malformed multipart data");
       }
@@ -55,12 +60,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // إرسال البيانات لصفحة العرض
+  // إرسال مصفوفة الصور كاملة لصفحة الـ HTML
   if (req.method === 'GET') {
-    if (!lastUploadedImage) {
-      return res.status(200).json({ message: "No images yet" });
-    }
-    return res.status(200).json(lastUploadedImage);
+    return res.status(200).json(allImages);
   }
 
   return res.status(405).send("Method not allowed");
