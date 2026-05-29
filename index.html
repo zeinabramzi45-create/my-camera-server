@@ -3,25 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>معاينة كاميرا القمر الصناعي</title>
+    <title>معاينة صور الكاميرا</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        img { max-width: 100%; border-radius: 8px; margin-top: 15px; display: none; }
-        .status { color: #666; font-style: italic; }
+        img { max-width: 100%; border-radius: 8px; margin-top: 15px; display: none; border: 2px solid #ddd; }
+        .status { color: #28a745; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>لوحة التحكم واستقبال الصور 📸</h2>
-        <p class="status" id="status-text">جاري التحقق من وجود صور...</p>
+        <h2>لوحة استقبال صور الكاميرا (طريقة الـ Multipart) 📸</h2>
+        <p id="status-text">جاري فحص السيرفر...</p>
         <img id="camera-frame" src="" alt="Camera Stream">
     </div>
 
     <script>
         async function fetchImage() {
             try {
-                // هيروح ينده على الـ API اللي عملناه ويشوف لو في صورة
                 const response = await fetch('/api/upload');
                 const data = await response.json();
                 
@@ -29,18 +28,16 @@
                     const img = document.getElementById('camera-frame');
                     img.src = "data:image/jpeg;base64," + data.data;
                     img.style.display = "block";
-                    document.getElementById('status-text').innerText = "آخر صورة تم استقبالها في: " + new Date(data.time).toLocaleString('ar-EG');
+                    document.getElementById('status-text').innerText = "آخر صورة وصلت في: " + new Date(data.time).toLocaleString('ar-EG');
                 } else {
-                    document.getElementById('status-text').innerText = "السيرفر جاهز، ومستني الكاميرا تبعت أول صورة... 📡";
+                    document.getElementById('status-text').innerText = "السيرفر شغال ومستني أول صورة من الكاميرا... 📡";
                 }
             } catch (err) {
-                document.getElementById('status-text').innerText = "السيرفر شغال وتمام 👍";
+                document.getElementById('status-text').innerText = "خطأ في الاتصال بالسيرفر";
             }
         }
-        // يشتغل تلقائياً أول ما الصفحة تفتح
         fetchImage();
-        // يعمل تحديث تلقائي كل 5 ثواني عشان لو الصورة اتغيرت
-        setInterval(fetchImage, 5000);
+        setInterval(fetchImage, 3000); // تحديث تلقائي كل 3 ثواني
     </script>
 </body>
 </html>
