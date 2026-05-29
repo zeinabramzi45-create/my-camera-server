@@ -1,4 +1,4 @@
-const SUPABASE_URL = "https://fnpzucecyatjqnmoowuy.supabase.co"; 
+const SUPABASE_URL = "https://supabase.com/dashboard/project/fnpzucecyatjqnmoowuy/settings/api-keys"; 
 const SUPABASE_KEY = "sb_publishable_BNDYkCj9c466S2P3I89S2A_lltdDqMF";
 const BUCKET_NAME = "photos";
 
