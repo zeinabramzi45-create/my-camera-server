@@ -1,51 +1,69 @@
-const { createClient } = require('@supabase/supabase-js');
-const formidable = require('formidable');
-const fs = require('fs');
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
-// ربط السيرفر بـ Supabase من خلال الـ Environment Variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// تحويل المتغير إلى مصفوفة (Array) لتخزين كل الصور
+let allImages = [];
 
-module.exports = async (req, res) => {
-  // استقبال طلبات الـ POST من الكاميرا
+function parseMultipart(req) {
+  return new Promise((resolve, reject) => {
+    let chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', (err) => reject(err));
+  });
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // استقبال صورة جديدة وإضافتها للمجموعة
   if (req.method === 'POST') {
-    const form = new formidable.IncomingForm();
-    
-    form.parse(req, async (err, fields, files) => {
-      if (err) {
-        return res.status(500).json({ error: 'Parsing error' });
-      }
+    try {
+      const rawBuffer = await parseMultipart(req);
+      const bufferStr = rawBuffer.toString('binary');
+      
+      const startIdx = bufferStr.indexOf('\r\n\r\n');
+      const endIdx = bufferStr.lastIndexOf('\r\n--');
 
-      // قراءة ملف الصورة القادم من الكاميرا
-      const file = files.imageFile;
-      if (!file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        const imageBinary = bufferStr.substring(startIdx + 4, endIdx);
+        const base64Data = Buffer.from(imageBinary, 'binary').toString('base64');
+        
+        // إضافة الصورة الجديدة في أول المصفوفة (عشان الأحدث يظهر فوق)
+        allImages.unshift({
+          data: base64Data,
+          time: new Date().toISOString()
+        });
 
-      try {
-        const fileBuffer = fs.readFileSync(file.path);
-        const fileName = `satellite-${Date.now()}.jpg`;
-
-        // الرفع المباشر لـ مخزن photos اللي فتحنا صلاحياته
-        const { data, error } = await supabase.storage
-          .from('photos')
-          .upload(fileName, fileBuffer, {
-            contentType: 'image/jpeg',
-            upsert: true
-          });
-
-        if (error) {
-          return res.status(500).json({ error: error.message });
+        // اختياري: للحفاظ على ذاكرة السيرفر المجاني، بنحتفظ بآخر 50 صورة مثلاً
+        if (allImages.length > 50) {
+          allImages.pop(); 
         }
 
-        return res.status(200).json({ message: 'Image Saved Permanently', data });
-      } catch (catchError) {
-        return res.status(500).json({ error: catchError.message });
+        console.log('New image added to the gallery!');
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send("HTTP/1.1 200 OK\r\n\r\nImage Received");
+      } else {
+        return res.status(400).send("Malformed multipart data");
       }
-    });
-  } else {
-    // لو أي طلب تاني (زي الـ GET من المتصفح) هيرجع رسالة بسيطة عشان ميعملش كراش
-    return res.status(200).json({ message: "Server is running perfectly!" });
+    } catch (error) {
+      return res.status(500).send(error.message);
+    }
   }
-};
+
+  // إرسال مصفوفة الصور كاملة لصفحة الـ HTML
+  if (req.method === 'GET') {
+    return res.status(200).json(allImages);
+  }
+
+  return res.status(405).send("Method not allowed");
+}
